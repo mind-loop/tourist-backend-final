@@ -24,8 +24,20 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }))
 
+const ALLOWED_ORIGINS = [
+  'https://tourist-api.e-uvs.mn',
+  'https://www.e-uvs.mn',
+  'https://e-uvs.mn',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]
+
 app.use(cors({
-  origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    // server-to-server (origin байхгүй) болон жагсаалтад байвал зөвшөөрнө
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
+    cb(new Error(`CORS: ${origin} зөвшөөрөгдөөгүй`))
+  },
   credentials: true,
   methods:     ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
