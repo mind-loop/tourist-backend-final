@@ -30,11 +30,12 @@ export async function createContentPayment(req: Request, res: Response) {
     }
 
     const contentLabel: Record<ContentType, string> = {
-      tourist_place:    'Үзэсгэлэнт газар',
+      tourist_place: 'Үзэсгэлэнт газар',
       historical_place: 'Хөшөө дурсгал',
-      tour:             'Аялал',
-      banner:           'Баннер',
-      article:          'Нийтлэл',
+      tour: 'Аялал',
+      banner: 'Баннер',
+      article: 'Нийтлэл',
+      admin_upgrade: ''
     }
 
     const invoiceNo = `${contentType.toUpperCase()}-${contentId}-${Date.now()}`
