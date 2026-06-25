@@ -27,6 +27,7 @@ app.use(helmet({
 const ALLOWED_ORIGINS = [
   'https://tourist-api.e-uvs.mn',
   'https://www.e-uvs.mn',
+  'https://tourist.e-uvs.mn',
   'https://e-uvs.mn',
   'http://localhost:5173',
   'http://localhost:3000',
