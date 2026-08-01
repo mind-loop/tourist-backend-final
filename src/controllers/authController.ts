@@ -13,6 +13,18 @@ function safeUser(u: any) {
   return { id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar || null, provider: u.provider }
 }
 
+// Startup migration — facebook_id багана болон provider enum-д 'facebook' нэмнэ
+export async function migrateAuth() {
+  await pool.execute(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS facebook_id VARCHAR(255) DEFAULT NULL, ADD INDEX idx_facebook_id (facebook_id)`
+  ).catch(() =>
+    pool.execute(`ALTER TABLE users ADD COLUMN facebook_id VARCHAR(255) DEFAULT NULL, ADD INDEX idx_facebook_id (facebook_id)`).catch(() => {})
+  )
+  await pool.execute(
+    `ALTER TABLE users MODIFY COLUMN provider ENUM('local','google','facebook') NOT NULL DEFAULT 'local'`
+  ).catch(() => {})
+}
+
 // POST /auth/register
 export async function register(req: Request, res: Response) {
   try {
@@ -93,6 +105,57 @@ export async function googleCallback(req: Request, res: Response) {
     res.json({ success: true, data: { ...safeUser(user), token } })
   } catch (err: any) {
     console.error('google callback error:', err)
+    res.status(500).json({ success: false, message: 'Серверийн алдаа' })
+  }
+}
+
+// POST /auth/facebook/callback  — frontend Facebook Login flow
+export async function facebookCallback(req: Request, res: Response) {
+  try {
+    const { accessToken } = req.body
+    if (!accessToken) return res.status(400).json({ success: false, message: 'Facebook access token дутуу байна' })
+
+    // Access token-г клиентээс ирсэн профайлыг найдахын оронд Facebook Graph API-аар шалгана
+    const fbRes = await fetch(
+      `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`
+    )
+    const fbData: any = await fbRes.json()
+    if (!fbRes.ok || fbData.error) {
+      return res.status(401).json({ success: false, message: 'Facebook token хүчингүй байна' })
+    }
+
+    const facebookId = fbData.id
+    const email       = fbData.email
+    const name        = fbData.name
+    const avatar      = fbData.picture?.data?.url || null
+    if (!facebookId || !email) {
+      return res.status(400).json({ success: false, message: 'Facebook имэйл хандах эрх шаардлагатай' })
+    }
+
+    const [rows]: any = await pool.execute(
+      'SELECT * FROM users WHERE facebook_id = ? OR email = ? LIMIT 1',
+      [facebookId, email.toLowerCase().trim()]
+    )
+    let user = rows[0]
+
+    if (!user) {
+      const [result]: any = await pool.execute(
+        `INSERT INTO users (name, email, avatar, role, provider, facebook_id) VALUES (?, ?, ?, 'user', 'facebook', ?)`,
+        [name, email.toLowerCase().trim(), avatar, facebookId]
+      )
+      const [newRows]: any = await pool.execute('SELECT * FROM users WHERE id = ? LIMIT 1', [result.insertId])
+      user = newRows[0]
+    } else if (!user.facebook_id) {
+      await pool.execute(
+        'UPDATE users SET facebook_id = ?, avatar = COALESCE(avatar, ?), provider = ? WHERE id = ?',
+        [facebookId, avatar, 'facebook', user.id]
+      )
+    }
+
+    const token = signToken({ id: user.id, email: user.email, role: user.role })
+    res.json({ success: true, data: { ...safeUser(user), token } })
+  } catch (err: any) {
+    console.error('facebook callback error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }

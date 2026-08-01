@@ -13,6 +13,7 @@ import * as routes   from '../controllers/routesController'
 import * as tours    from '../controllers/toursController'
 import * as pricing  from '../controllers/pricingController'
 import * as payment  from '../controllers/paymentController'
+import * as services from '../controllers/servicesController'
 
 const r = Router()
 
@@ -20,6 +21,7 @@ const r = Router()
 r.post('/auth/register',        auth.register)
 r.post('/auth/login',           auth.login)
 r.post('/auth/google/callback', auth.googleCallback)
+r.post('/auth/facebook/callback', auth.facebookCallback)
 r.get ('/auth/me',              authenticate, auth.getMe)
 r.post('/auth/logout',          authenticate, auth.logout)
 
@@ -121,6 +123,18 @@ r.put   ('/tours/:id',                         authenticate, requireAdmin, uploa
 r.delete('/tours/:id',                         authenticate, requireAdmin, tours.deleteTour)
 r.patch ('/tours/:id/status',                  authenticate, requireAdmin, tours.updateTourStatus)
 r.patch ('/tours/registrations/:regId/status', authenticate, requireAdmin, tours.updateRegistrationStatus)
+
+// ── Services (public) ─────────────────────────────────────────────────────────
+r.get('/services',            services.getServices)
+r.get('/services/admin/list', authenticate, requireAdmin, services.getAdminServices)
+r.get('/services/id/:id',     authenticate, requireAdmin, services.getServiceById)
+r.get('/services/:slug',      services.getServiceBySlug)
+
+// ── Services (admin) ──────────────────────────────────────────────────────────
+r.post  ('/services',            authenticate, requireAdmin, uploadSingle, services.createService)
+r.put   ('/services/:id',        authenticate, requireAdmin, uploadSingle, services.updateService)
+r.delete('/services/:id',        authenticate, requireAdmin, services.deleteService)
+r.patch ('/services/:id/status', authenticate, requireAdmin, services.updateServiceStatus)
 
 
 export default r

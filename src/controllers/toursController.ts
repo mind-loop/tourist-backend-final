@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 import * as qpay from '../services/qpayService'
+import { autoTranslateFields } from '../utils/autoTranslate'
 
 // GET /tours  (public)
 export async function getTours(req: Request, res: Response) {
@@ -344,6 +345,8 @@ export async function createTour(req: Request, res: Response) {
     const payment_qr  = qrFile    ? `/uploads/images/${qrFile.filename}`   : b.payment_qr || null
     const slug = `tour-${Date.now()}`
 
+    await autoTranslateFields(b, ['title', 'description'])
+
     const [result]: any = await pool.execute(
       `INSERT INTO tours
          (slug, title_mn, title_en, title_ru,
@@ -395,6 +398,8 @@ export async function updateTour(req: Request, res: Response) {
     const qrFile    = files?.qr_image?.[0] || null
     const cover_image = coverFile ? `/uploads/images/${coverFile.filename}` : b.cover_image || null
     const payment_qr  = qrFile    ? `/uploads/images/${qrFile.filename}`   : b.payment_qr || null
+
+    await autoTranslateFields(b, ['title', 'description'])
 
     await pool.execute(
       `UPDATE tours SET

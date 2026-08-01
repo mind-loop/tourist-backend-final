@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
+import { autoTranslateFields } from '../utils/autoTranslate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -79,6 +80,8 @@ export async function createArticle(req: Request, res: Response) {
     const b = req.body
     if (!b.title_mn) return res.status(400).json({ success: false, message: 'Монгол гарчиг заавал шаардлагатай' })
 
+    await autoTranslateFields(b, ['title', 'excerpt', 'content'])
+
     const slug = `article-${Date.now()}`
     const coverImage = req.file ? `/uploads/images/${req.file.filename}` : null
     const isPublished = b.status === 'published'
@@ -137,6 +140,8 @@ export async function updateArticle(req: Request, res: Response) {
     const b = req.body
     const coverImage = req.file ? `/uploads/images/${req.file.filename}` : b.cover_image || null
     const isPublished = b.status === 'published'
+
+    await autoTranslateFields(b, ['title', 'excerpt', 'content'])
 
     await pool.execute(
       `UPDATE articles SET

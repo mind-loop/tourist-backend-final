@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 import slugify from 'slugify'
+import { autoTranslateFields } from '../utils/autoTranslate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -197,6 +198,8 @@ export async function createPlace(req: Request, res: Response) {
       return res.status(400).json({ success: false, message: 'Монгол нэр заавал шаардлагатай' })
     }
 
+    await autoTranslateFields(b, ['name', 'description', 'best_season', 'open_hours'])
+
     const base = slugify(b.name_mn, { lower: true, strict: true }) || 'place'
     const slug = `${base}-${Date.now()}`
 
@@ -273,6 +276,8 @@ export async function updatePlace(req: Request, res: Response) {
     const { id } = req.params
     const b = req.body
     const files = (req.files as Express.Multer.File[]) || []
+
+    await autoTranslateFields(b, ['name', 'description', 'best_season', 'open_hours'])
 
     await pool.execute(
       `UPDATE places SET

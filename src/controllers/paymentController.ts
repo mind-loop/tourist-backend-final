@@ -35,6 +35,7 @@ export async function createContentPayment(req: Request, res: Response) {
       tour: 'Аялал',
       banner: 'Баннер',
       article: 'Нийтлэл',
+      service: 'Үйлчилгээ',
       admin_upgrade: ''
     }
 
@@ -265,6 +266,9 @@ async function publishContent(contentType: ContentType, contentId: number) {
       break
     case 'article':
       await pool.execute(`UPDATE articles SET status='published' WHERE id=?`, [contentId])
+      break
+    case 'service':
+      await pool.execute(`UPDATE services SET status='published' WHERE id=?`, [contentId])
       break
     case 'admin_upgrade':
       await pool.execute(`UPDATE users SET role='admin' WHERE id=?`, [contentId])

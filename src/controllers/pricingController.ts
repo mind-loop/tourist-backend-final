@@ -1,10 +1,10 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 
-export type ContentType = 'tourist_place' | 'historical_place' | 'tour' | 'banner' | 'article' | 'admin_upgrade'
+export type ContentType = 'tourist_place' | 'historical_place' | 'tour' | 'banner' | 'article' | 'service' | 'admin_upgrade'
 
 export const CONTENT_TYPES: ContentType[] = [
-  'tourist_place', 'historical_place', 'tour', 'banner', 'article', 'admin_upgrade',
+  'tourist_place', 'historical_place', 'tour', 'banner', 'article', 'service', 'admin_upgrade',
 ]
 
 // tour_commission is stored separately (% not flat fee)

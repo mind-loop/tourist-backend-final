@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
+import { autoTranslateFields } from '../utils/autoTranslate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -54,6 +55,8 @@ export async function createRoute(req: Request, res: Response) {
     const file = (req.file as Express.Multer.File) || null
     const cover_image = file ? `/uploads/images/${file.filename}` : b.cover_image || null
 
+    await autoTranslateFields(b, ['title', 'from', 'to'])
+
     const [result]: any = await pool.execute(
       `INSERT INTO routes
          (title_mn, title_en, title_ru,
@@ -90,6 +93,8 @@ export async function updateRoute(req: Request, res: Response) {
     const b = req.body
     const file = (req.file as Express.Multer.File) || null
     const cover_image = file ? `/uploads/images/${file.filename}` : b.cover_image || null
+
+    await autoTranslateFields(b, ['title', 'from', 'to'])
 
     await pool.execute(
       `UPDATE routes SET

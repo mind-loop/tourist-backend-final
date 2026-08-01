@@ -13,6 +13,8 @@ import { migrateTours }   from './controllers/toursController'
 import { migratePayments } from './controllers/paymentController'
 import { migratePricing }  from './controllers/pricingController'
 import { migrateBanners }  from './controllers/bannersController'
+import { migrateAuth }     from './controllers/authController'
+import { migrateServices } from './controllers/servicesController'
 
 dotenv.config()
 
@@ -30,7 +32,9 @@ const ALLOWED_ORIGINS = [
   'https://tourist.e-uvs.mn',
   'https://e-uvs.mn',
   'http://localhost:5173',
+  'https://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:8020'
 ]
 
 app.use(cors({
@@ -98,6 +102,8 @@ async function start() {
     await migratePayments()
     await migratePricing()
     await migrateBanners()
+    await migrateAuth()
+    await migrateServices()
     app.listen(PORT, () => {
       console.log(`\n🚀  QRUVS API  →  http://localhost:${PORT}`)
       console.log(`📡  ENV: ${process.env.NODE_ENV || 'development'}`)

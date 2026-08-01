@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
+import { autoTranslateFields } from '../utils/autoTranslate'
 
 // GET /tags
 export async function getTags(_req: Request, res: Response) {
@@ -15,8 +16,10 @@ export async function getTags(_req: Request, res: Response) {
 // POST /tags (admin)
 export async function createTag(req: Request, res: Response) {
   try {
+    if (!req.body.key_name || !req.body.label_mn) return res.status(400).json({ success: false, message: 'key_name болон label_mn заавал шаардлагатай' })
+
+    await autoTranslateFields(req.body, ['label'])
     const { key_name, label_mn, label_en, label_ru, icon } = req.body
-    if (!key_name || !label_mn) return res.status(400).json({ success: false, message: 'key_name болон label_mn заавал шаардлагатай' })
 
     const [result]: any = await pool.execute(
       'INSERT INTO tags (key_name, label_mn, label_en, label_ru, icon) VALUES (?,?,?,?,?)',
