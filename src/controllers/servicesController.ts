@@ -34,6 +34,7 @@ export async function migrateServices() {
       latitude       DECIMAL(10,7) DEFAULT NULL,
       longitude      DECIMAL(10,7) DEFAULT NULL,
       cover_image    VARCHAR(500) DEFAULT NULL,
+      youtube_url    VARCHAR(500) DEFAULT NULL,
       status         ENUM('published','draft') NOT NULL DEFAULT 'draft',
       created_by     INT DEFAULT NULL,
       created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -47,6 +48,7 @@ export async function migrateServices() {
 
   // category нь эрт үед ENUM('hotel','restaurant','repair','other') байсан —
   // одоо чөлөөт ангилалын жагсаалт болгож VARCHAR руу шилжүүлж, хуучин утгуудыг шинэ key рүү мапп хийнэ
+  await pool.execute(`ALTER TABLE services ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`).catch(() => {})
   await pool.execute(`ALTER TABLE services MODIFY COLUMN category VARCHAR(30) NOT NULL DEFAULT 'other'`).catch(() => {})
   await pool.execute(`UPDATE services SET category='accommodation' WHERE category='hotel'`).catch(() => {})
   await pool.execute(`UPDATE services SET category='car_repair' WHERE category='repair'`).catch(() => {})
@@ -156,8 +158,8 @@ export async function createService(req: Request, res: Response) {
           description_mn, description_en, description_ru,
           category, address_mn, address_en, address_ru,
           phone, open_hours_mn, open_hours_en, open_hours_ru,
-          latitude, longitude, cover_image, status, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          latitude, longitude, cover_image, youtube_url, status, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug,
         b.name_mn, b.name_en || '', b.name_ru || '',
@@ -168,7 +170,7 @@ export async function createService(req: Request, res: Response) {
         b.open_hours_mn || null, b.open_hours_en || null, b.open_hours_ru || null,
         b.latitude ? parseFloat(b.latitude) : null,
         b.longitude ? parseFloat(b.longitude) : null,
-        cover_image, b.status || 'draft',
+        cover_image, b.youtube_url || null, b.status || 'draft',
         req.user!.id,
       ]
     )
@@ -198,7 +200,7 @@ export async function updateService(req: Request, res: Response) {
          description_mn=?, description_en=?, description_ru=?,
          category=?, address_mn=?, address_en=?, address_ru=?,
          phone=?, open_hours_mn=?, open_hours_en=?, open_hours_ru=?,
-         latitude=?, longitude=?, cover_image=?, status=?
+         latitude=?, longitude=?, cover_image=?, youtube_url=?, status=?
        WHERE id=?`,
       [
         b.name_mn, b.name_en || '', b.name_ru || '',
@@ -209,7 +211,7 @@ export async function updateService(req: Request, res: Response) {
         b.open_hours_mn || null, b.open_hours_en || null, b.open_hours_ru || null,
         b.latitude ? parseFloat(b.latitude) : null,
         b.longitude ? parseFloat(b.longitude) : null,
-        cover_image, b.status || 'draft',
+        cover_image, b.youtube_url || null, b.status || 'draft',
         id,
       ]
     )

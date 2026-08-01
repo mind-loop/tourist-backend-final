@@ -27,7 +27,7 @@ const limits = { fileSize: MAX_MB * 1024 * 1024 }
 
 // Cast to RequestHandler to avoid multer @types conflict with express @types
 export const uploadSingle      = multer({ storage, fileFilter, limits }).single('image')   as unknown as RequestHandler
-export const uploadMultiple    = multer({ storage, fileFilter, limits }).array('images', 20) as unknown as RequestHandler
+export const uploadMultiple    = multer({ storage, fileFilter, limits }).array('images', 5)  as unknown as RequestHandler
 export const uploadCover       = multer({ storage, fileFilter, limits }).single('cover')   as unknown as RequestHandler
 export const uploadTourFields  = multer({ storage, fileFilter, limits }).fields([
   { name: 'image', maxCount: 1 },

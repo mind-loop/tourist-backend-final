@@ -5,6 +5,8 @@ import { autoTranslateFields } from '../utils/autoTranslate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
+const MAX_PLACE_IMAGES = 5
+
 async function ownsPlace(id: string | number, userId: number, role: string) {
   if (role === 'superadmin') return true
   const [r]: any = await pool.execute('SELECT created_by FROM places WHERE id=? LIMIT 1', [id])
@@ -16,6 +18,7 @@ export async function migratePlaces() {
   for (const sql of [
     `ALTER TABLE places ADD COLUMN IF NOT EXISTS aimag_center_km DECIMAL(8,1) DEFAULT NULL`,
     `ALTER TABLE places ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL`,
+    `ALTER TABLE places ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`,
   ]) {
     await pool.execute(sql).catch(() => {
       // MySQL 5.x fallback — strip IF NOT EXISTS
@@ -197,6 +200,9 @@ export async function createPlace(req: Request, res: Response) {
     if (!b.name_mn) {
       return res.status(400).json({ success: false, message: 'Монгол нэр заавал шаардлагатай' })
     }
+    if (files.length > MAX_PLACE_IMAGES) {
+      return res.status(400).json({ success: false, message: `Нэг газарт хамгийн ихдээ ${MAX_PLACE_IMAGES} зураг оруулах боломжтой` })
+    }
 
     await autoTranslateFields(b, ['name', 'description', 'best_season', 'open_hours'])
 
@@ -210,8 +216,8 @@ export async function createPlace(req: Request, res: Response) {
           category, latitude, longitude, altitude, area, depth,
           best_season_mn, best_season_en, best_season_ru,
           entry_fee, open_hours_mn, open_hours_en, open_hours_ru,
-          phone, aimag_center_km, status, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          phone, aimag_center_km, youtube_url, status, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug,
         b.name_mn,
@@ -235,6 +241,7 @@ export async function createPlace(req: Request, res: Response) {
         b.open_hours_ru  || null,
         b.phone      || null,
         b.aimag_center_km ? parseFloat(b.aimag_center_km) : null,
+        b.youtube_url || null,
         b.status     || 'draft',
         req.user!.id,
       ]
@@ -277,6 +284,13 @@ export async function updatePlace(req: Request, res: Response) {
     const b = req.body
     const files = (req.files as Express.Multer.File[]) || []
 
+    if (files.length > 0) {
+      const [[{ cnt }]]: any = await pool.execute('SELECT COUNT(*) AS cnt FROM place_images WHERE place_id = ?', [id])
+      if (Number(cnt) + files.length > MAX_PLACE_IMAGES) {
+        return res.status(400).json({ success: false, message: `Нэг газарт хамгийн ихдээ ${MAX_PLACE_IMAGES} зураг оруулах боломжтой (одоо ${cnt} зурагтай)` })
+      }
+    }
+
     await autoTranslateFields(b, ['name', 'description', 'best_season', 'open_hours'])
 
     await pool.execute(
@@ -287,7 +301,7 @@ export async function updatePlace(req: Request, res: Response) {
          altitude=?, area=?, depth=?,
          best_season_mn=?, best_season_en=?, best_season_ru=?,
          entry_fee=?, open_hours_mn=?, open_hours_en=?, open_hours_ru=?,
-         phone=?, aimag_center_km=?, status=?
+         phone=?, aimag_center_km=?, youtube_url=?, status=?
        WHERE id=?`,
       [
         b.name_mn, b.name_en || '', b.name_ru || '',
@@ -301,6 +315,7 @@ export async function updatePlace(req: Request, res: Response) {
         b.open_hours_mn || null, b.open_hours_en || null, b.open_hours_ru || null,
         b.phone || null,
         b.aimag_center_km ? parseFloat(b.aimag_center_km) : null,
+        b.youtube_url || null,
         b.status || 'draft',
         id,
       ]

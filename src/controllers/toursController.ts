@@ -355,8 +355,8 @@ export async function createTour(req: Request, res: Response) {
           max_participants, meeting_point_mn,
           contact_phone, contact_email,
           payment_bank, payment_account, payment_name, payment_qr,
-          cover_image, status, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          cover_image, youtube_url, status, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug,
         b.title_mn || '', b.title_en || '', b.title_ru || '',
@@ -369,7 +369,7 @@ export async function createTour(req: Request, res: Response) {
         b.contact_phone || null, b.contact_email || null,
         b.payment_bank || null, b.payment_account || null, b.payment_name || null,
         payment_qr,
-        cover_image, b.status || 'draft',
+        cover_image, b.youtube_url || null, b.status || 'draft',
         req.user!.id,
       ]
     )
@@ -409,7 +409,7 @@ export async function updateTour(req: Request, res: Response) {
          max_participants=?, meeting_point_mn=?,
          contact_phone=?, contact_email=?,
          payment_bank=?, payment_account=?, payment_name=?, payment_qr=?,
-         cover_image=?, status=?
+         cover_image=?, youtube_url=?, status=?
        WHERE id=?`,
       [
         b.title_mn || '', b.title_en || '', b.title_ru || '',
@@ -422,7 +422,7 @@ export async function updateTour(req: Request, res: Response) {
         b.contact_phone || null, b.contact_email || null,
         b.payment_bank || null, b.payment_account || null, b.payment_name || null,
         payment_qr,
-        cover_image, b.status || 'draft',
+        cover_image, b.youtube_url || null, b.status || 'draft',
         req.params.id,
       ]
     )
@@ -483,6 +483,7 @@ export async function migrateTours() {
     `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settled_by INT DEFAULT NULL`,
     `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50) DEFAULT NULL`,
     `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_email VARCHAR(150) DEFAULT NULL`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`,
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_invoice_id VARCHAR(200) DEFAULT NULL`,
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_status ENUM('free','pending','paid') DEFAULT 'free'`,
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2) DEFAULT 0`,

@@ -14,6 +14,7 @@ import * as tours    from '../controllers/toursController'
 import * as pricing  from '../controllers/pricingController'
 import * as payment  from '../controllers/paymentController'
 import * as services from '../controllers/servicesController'
+import * as revenue  from '../controllers/revenueController'
 
 const r = Router()
 
@@ -22,6 +23,11 @@ r.post('/auth/register',        auth.register)
 r.post('/auth/login',           auth.login)
 r.post('/auth/google/callback', auth.googleCallback)
 r.post('/auth/facebook/callback', auth.facebookCallback)
+r.post('/auth/google/link',     authenticate, auth.linkGoogle)
+r.post('/auth/facebook/link',   authenticate, auth.linkFacebook)
+r.post('/auth/forgot-password', auth.forgotPassword)
+r.post('/auth/reset-password',  auth.resetPassword)
+r.post('/auth/change-password', authenticate, auth.changePassword)
 r.get ('/auth/me',              authenticate, auth.getMe)
 r.post('/auth/logout',          authenticate, auth.logout)
 
@@ -77,7 +83,8 @@ r.get  ('/users',          authenticate, requireAdmin,      users.getUsers)
 r.patch('/users/:id/role', authenticate, requireSuperAdmin, users.updateRole)
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
-r.get('/dashboard/stats', authenticate, requireAdmin, users.getDashboardStats)
+r.get('/dashboard/stats',   authenticate, requireAdmin, users.getDashboardStats)
+r.get('/dashboard/revenue', authenticate, requireAdmin, revenue.getRevenueDashboard)
 
 // ── Pricing (superadmin) ──────────────────────────────────────────────────────
 r.get('/pricing',                     authenticate, requireAdmin,      pricing.getPricing)

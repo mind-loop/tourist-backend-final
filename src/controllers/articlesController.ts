@@ -10,6 +10,13 @@ async function ownsArticle(id: string | number, userId: number, role: string) {
   return r.length > 0 && r[0].author_id === userId
 }
 
+// Startup migration
+export async function migrateArticles() {
+  await pool.execute(`ALTER TABLE articles ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`).catch(() =>
+    pool.execute(`ALTER TABLE articles ADD COLUMN youtube_url VARCHAR(500) DEFAULT NULL`).catch(() => {})
+  )
+}
+
 // GET /articles  (public)
 export async function getArticles(req: Request, res: Response) {
   try {
@@ -91,14 +98,14 @@ export async function createArticle(req: Request, res: Response) {
          (slug, title_mn, title_en, title_ru,
           content_mn, content_en, content_ru,
           excerpt_mn, excerpt_en, excerpt_ru,
-          cover_image, tags, status, author_id, published_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          cover_image, youtube_url, tags, status, author_id, published_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         slug,
         b.title_mn, b.title_en || '', b.title_ru || '',
         b.content_mn || null, b.content_en || null, b.content_ru || null,
         b.excerpt_mn || null, b.excerpt_en || null, b.excerpt_ru || null,
-        coverImage,
+        coverImage, b.youtube_url || null,
         b.tags ? JSON.stringify(JSON.parse(b.tags)) : JSON.stringify([]),
         b.status || 'draft',
         req.user!.id,
@@ -148,14 +155,14 @@ export async function updateArticle(req: Request, res: Response) {
          title_mn=?, title_en=?, title_ru=?,
          content_mn=?, content_en=?, content_ru=?,
          excerpt_mn=?, excerpt_en=?, excerpt_ru=?,
-         cover_image=?, status=?,
+         cover_image=?, youtube_url=?, status=?,
          published_at=COALESCE(IF(? AND published_at IS NULL, NOW(), published_at), published_at)
        WHERE id=?`,
       [
         b.title_mn, b.title_en || '', b.title_ru || '',
         b.content_mn || null, b.content_en || null, b.content_ru || null,
         b.excerpt_mn || null, b.excerpt_en || null, b.excerpt_ru || null,
-        coverImage, b.status || 'draft',
+        coverImage, b.youtube_url || null, b.status || 'draft',
         isPublished,
         req.params.id,
       ]
