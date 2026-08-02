@@ -24,8 +24,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # ── Uploaded files ────────────────────────────────────────────────────────────
-backend/uploads/images/*
-!backend/uploads/images/.gitkeep
+uploads/images/*
+!uploads/images/.gitkeep
 
 # ── OS files ──────────────────────────────────────────────────────────────────
 .DS_Store
