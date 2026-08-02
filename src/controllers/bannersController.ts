@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { alterTableSafe } from '../utils/dbMigrate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -97,7 +98,5 @@ export async function deleteBanner(req: Request, res: Response) {
 
 // DB migration
 export async function migrateBanners() {
-  await pool.execute(
-    `ALTER TABLE banners ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL`
-  ).catch(() => {})
+  await alterTableSafe(`ALTER TABLE banners ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL`)
 }
