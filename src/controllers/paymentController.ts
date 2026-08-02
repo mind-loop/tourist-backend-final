@@ -2,6 +2,11 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import * as qpay from '../services/qpayService'
 import { getFeeFor, type ContentType } from './pricingController'
+import { creditWalletTopup } from './walletController'
+
+// Хэтэвчний feature-г түр нуусан — хэрэглэгчийн шаардлагад нийцээгүй тул идэвхгүй болгов.
+// Дахин идэвхжүүлэхдээ энэ утгыг true болгоно.
+const WALLET_ENABLED = false
 
 // GET /pricing/fee/:contentType  — frontend checks price before showing QPay
 export async function getContentFee(req: Request, res: Response) {
@@ -39,6 +44,34 @@ export async function createContentPayment(req: Request, res: Response) {
       admin_upgrade: ''
     }
 
+    // Хэтэвчинд хангалттай үлдэгдэл байвал шууд түүнээс хасаж, QPay-гүйгээр нийтэлнэ
+    const userId = req.user?.id ?? null
+    const [[walletUser]]: any = WALLET_ENABLED
+      ? await pool.query('SELECT wallet_balance FROM users WHERE id = ? LIMIT 1', [userId])
+      : [[null]]
+    const walletBalance = Number(walletUser?.wallet_balance) || 0
+
+    if (WALLET_ENABLED && userId && walletBalance >= fee) {
+      const newBalance = walletBalance - fee
+      const invoiceId = `WALLET-${contentType.toUpperCase()}-${contentId}-${Date.now()}`
+      const description = `${contentLabel[contentType] ?? contentType} байршуулах хураамж #${contentId}`
+
+      await pool.execute('UPDATE users SET wallet_balance = ? WHERE id = ?', [newBalance, userId])
+      await pool.execute(
+        `INSERT INTO wallet_transactions (user_id, type, amount, balance_after, description, invoice_id, status)
+         VALUES (?, 'payment', ?, ?, ?, ?, 'paid')`,
+        [userId, fee, newBalance, description, invoiceId]
+      )
+      await pool.execute(
+        `INSERT INTO content_payments (content_type, content_id, user_id, invoice_id, amount, status, paid_at)
+         VALUES (?,?,?,?,?, 'paid', NOW())`,
+        [contentType, Number(contentId), userId, invoiceId, fee]
+      )
+      await publishContent(contentType, Number(contentId))
+
+      return res.json({ success: true, data: { paidByWallet: true, amount: fee, balance: newBalance } })
+    }
+
     const invoiceNo = `${contentType.toUpperCase()}-${contentId}-${Date.now()}`
     const result = await qpay.createInvoice({
       invoiceNo,
@@ -46,19 +79,14 @@ export async function createContentPayment(req: Request, res: Response) {
       amount: fee,
     })
 
-    if (!result.invoiceId) {
-      throw new Error('QPay invoice_id хоосон байна — response format шалгана уу')
-    }
-
-    const userId = req.user?.id ?? null
     const qrText  = result.qrText  || null
     const qrImage = result.qrImage || null
 
     await pool.execute(
       `INSERT INTO content_payments
-         (content_type, content_id, user_id, invoice_id, amount, qr_text, qr_image)
-       VALUES (?,?,?,?,?,?,?)`,
-      [contentType, Number(contentId), userId, result.invoiceId, fee, qrText, qrImage]
+         (content_type, content_id, user_id, invoice_id, amount, qr_text, qr_image, expires_at)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [contentType, Number(contentId), userId, result.invoiceId, fee, qrText, qrImage, result.expiresAt]
     )
 
     res.json({
@@ -83,7 +111,7 @@ export async function checkContentPayment(req: Request, res: Response) {
 
     // Already paid?
     const [existing]: any = await pool.execute(
-      `SELECT content_type, content_id, status FROM content_payments WHERE invoice_id = ? LIMIT 1`,
+      `SELECT content_type, content_id, status, expires_at FROM content_payments WHERE invoice_id = ? LIMIT 1`,
       [invoiceId]
     )
     if (!existing.length) return res.status(404).json({ success: false, message: 'Нэхэмжлэл олдсонгүй' })
@@ -99,6 +127,9 @@ export async function checkContentPayment(req: Request, res: Response) {
         [invoiceId]
       )
       await publishContent(existing[0].content_type as ContentType, existing[0].content_id)
+    } else if (qpay.isInvoiceExpired(existing[0].expires_at)) {
+      await pool.execute(`UPDATE content_payments SET status='expired' WHERE invoice_id=?`, [invoiceId])
+      return res.json({ success: true, data: { paid: false, expired: true } })
     }
 
     res.json({ success: true, data: { paid } })
@@ -108,30 +139,38 @@ export async function checkContentPayment(req: Request, res: Response) {
   }
 }
 
-// POST /pay/callback  (QPay webhook — no auth)
-// QPay sends: { payment_id, invoice_id } or just { invoice_id }
+// GET/POST /pay/callback  (QPay webhook — no auth)
+// QPay нь invoice_id-г body-, query string- эсвэл object_id талбараар илгээж болно тул бүгдийг шалгана.
+// Аюулгүй байдлын үүднээс webhook-ийн claim-д итгэлгүйгээр үргэлж qpay.checkPayment()-ээр дахин баталгаажуулна.
 export async function qpayCallback(req: Request, res: Response) {
-  // Always respond 200 first — QPay retries if it gets non-200
+  // Эхлээд 200 буцаана — QPay non-200 хариу авбал дахин дахин retry хийдэг
   res.json({ success: true })
 
   try {
-    // QPay may send invoice_id directly or nested inside object
-    const body = req.body || {}
-    const invoice_id: string =
+    const body  = req.body  || {}
+    const query = req.query || {}
+    const invoice_id: string = String(
       body.invoice_id ||
       body.invoiceId  ||
+      body.object_id  ||
       body.payment?.invoice_id ||
+      query.invoice_id ||
+      query.qpay_invoice_id ||
       ''
+    )
 
     if (!invoice_id) {
-      console.warn('[QPay callback] No invoice_id in body:', JSON.stringify(body))
+      console.warn('[QPay callback] invoice_id олдсонгүй. body:', JSON.stringify(body), 'query:', JSON.stringify(query))
       return
     }
 
     console.log('[QPay callback] invoice_id:', invoice_id)
 
     const { paid } = await qpay.checkPayment(invoice_id)
-    if (!paid) return
+    if (!paid) {
+      console.log('[QPay callback] invoice_status PAID биш, алгасав:', invoice_id)
+      return
+    }
 
     // 1. Check content_payments (admin content publishing fees)
     const [cpRows]: any = await pool.execute(
@@ -159,6 +198,10 @@ export async function qpayCallback(req: Request, res: Response) {
       )
       console.log('[QPay callback] tour_registration paid, id:', trRows[0].id)
     }
+
+    // 3. Check wallet_transactions (wallet top-up)
+    const credited = await creditWalletTopup(invoice_id)
+    if (credited) console.log('[QPay callback] wallet topup credited, invoice:', invoice_id)
   } catch (err) {
     console.error('[QPay callback] error:', err)
   }
@@ -196,15 +239,11 @@ export async function createUpgradePayment(req: Request, res: Response) {
       amount: fee,
     })
 
-    if (!result.invoiceId) {
-      throw new Error('QPay invoice_id хоосон байна')
-    }
-
     await pool.execute(
       `INSERT INTO content_payments
-         (content_type, content_id, user_id, invoice_id, amount, qr_text, qr_image)
-       VALUES ('admin_upgrade', ?, ?, ?, ?, ?, ?)`,
-      [userId, userId, result.invoiceId, fee, result.qrText || null, result.qrImage || null]
+         (content_type, content_id, user_id, invoice_id, amount, qr_text, qr_image, expires_at)
+       VALUES ('admin_upgrade', ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, userId, result.invoiceId, fee, result.qrText || null, result.qrImage || null, result.expiresAt]
     )
 
     res.json({
@@ -227,7 +266,7 @@ export async function checkUpgradePayment(req: Request, res: Response) {
   try {
     const { invoiceId } = req.params
     const [existing]: any = await pool.execute(
-      `SELECT content_id, status FROM content_payments WHERE invoice_id=? AND content_type='admin_upgrade' LIMIT 1`,
+      `SELECT content_id, status, expires_at FROM content_payments WHERE invoice_id=? AND content_type='admin_upgrade' LIMIT 1`,
       [invoiceId]
     )
     if (!existing.length) return res.status(404).json({ success: false, message: 'Нэхэмжлэл олдсонгүй' })
@@ -242,6 +281,9 @@ export async function checkUpgradePayment(req: Request, res: Response) {
         [invoiceId]
       )
       await pool.execute(`UPDATE users SET role='admin' WHERE id=?`, [existing[0].content_id])
+    } else if (qpay.isInvoiceExpired(existing[0].expires_at)) {
+      await pool.execute(`UPDATE content_payments SET status='expired' WHERE invoice_id=?`, [invoiceId])
+      return res.json({ success: true, data: { paid: false, expired: true } })
     }
 
     res.json({ success: true, data: { paid } })
@@ -297,9 +339,16 @@ export async function migratePayments() {
       qr_image     TEXT,
       created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       paid_at      TIMESTAMP NULL,
+      expires_at   TIMESTAMP NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       INDEX idx_content (content_type, content_id),
       INDEX idx_invoice (invoice_id)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  await pool.execute(
+    `ALTER TABLE content_payments ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP NULL`
+  ).catch(() =>
+    pool.execute(`ALTER TABLE content_payments ADD COLUMN expires_at TIMESTAMP NULL`).catch(() => {})
+  )
 }

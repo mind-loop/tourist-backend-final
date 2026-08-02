@@ -144,8 +144,8 @@ export async function registerTour(req: Request, res: Response) {
     })
 
     await pool.execute(
-      'UPDATE tour_registrations SET qpay_invoice_id = ? WHERE id = ?',
-      [invoice.invoiceId, registrationId]
+      'UPDATE tour_registrations SET qpay_invoice_id = ?, expires_at = ? WHERE id = ?',
+      [invoice.invoiceId, invoice.expiresAt, registrationId]
     )
 
     res.status(201).json({
@@ -173,7 +173,7 @@ export async function checkTourRegistrationPayment(req: Request, res: Response) 
     if (!invoiceId) return res.status(400).json({ success: false, message: 'invoiceId шаардлагатай' })
 
     const [rows]: any = await pool.execute(
-      'SELECT id, qpay_status FROM tour_registrations WHERE qpay_invoice_id = ? LIMIT 1',
+      'SELECT id, tour_id, qpay_status, participant_count, expires_at FROM tour_registrations WHERE qpay_invoice_id = ? LIMIT 1',
       [invoiceId]
     )
     if (!rows.length) return res.status(404).json({ success: false, message: 'Бүртгэл олдсонгүй' })
@@ -189,6 +189,14 @@ export async function checkTourRegistrationPayment(req: Request, res: Response) 
         `UPDATE tour_registrations SET qpay_status='paid', status='confirmed', paid_at=NOW() WHERE id=?`,
         [reg.id]
       )
+    } else if (qpay.isInvoiceExpired(reg.expires_at)) {
+      // Хугацаа дууссан бүртгэлийг цуцалж, түр эзэлсэн суудлыг чөлөөлнө
+      await pool.execute(`UPDATE tour_registrations SET status='cancelled' WHERE id=?`, [reg.id])
+      await pool.execute(
+        'UPDATE tours SET current_participants = GREATEST(0, current_participants - ?) WHERE id = ?',
+        [reg.participant_count, reg.tour_id]
+      )
+      return res.json({ success: true, data: { paid: false, expired: true } })
     }
     res.json({ success: true, data: { paid } })
   } catch (err: any) {
@@ -488,6 +496,7 @@ export async function migrateTours() {
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_status ENUM('free','pending','paid') DEFAULT 'free'`,
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2) DEFAULT 0`,
     `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP NULL`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP NULL`,
   ]
   for (const q of alterQueries) {
     await pool.execute(q).catch(() => {/* column may already exist in MySQL 5.x */})

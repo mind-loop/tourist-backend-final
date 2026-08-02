@@ -16,6 +16,7 @@ import { migrateBanners }  from './controllers/bannersController'
 import { migrateAuth }     from './controllers/authController'
 import { migrateServices } from './controllers/servicesController'
 import { migrateArticles } from './controllers/articlesController'
+import { migrateWallet }   from './controllers/walletController'
 
 dotenv.config()
 
@@ -106,6 +107,7 @@ async function start() {
     await migrateAuth()
     await migrateServices()
     await migrateArticles()
+    await migrateWallet()
     app.listen(PORT, () => {
       console.log(`\n🚀  QRUVS API  →  http://localhost:${PORT}`)
       console.log(`📡  ENV: ${process.env.NODE_ENV || 'development'}`)

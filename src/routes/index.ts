@@ -15,6 +15,7 @@ import * as pricing  from '../controllers/pricingController'
 import * as payment  from '../controllers/paymentController'
 import * as services from '../controllers/servicesController'
 import * as revenue  from '../controllers/revenueController'
+import * as wallet   from '../controllers/walletController'
 
 const r = Router()
 
@@ -84,7 +85,7 @@ r.patch('/users/:id/role', authenticate, requireSuperAdmin, users.updateRole)
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 r.get('/dashboard/stats',   authenticate, requireAdmin, users.getDashboardStats)
-r.get('/dashboard/revenue', authenticate, requireAdmin, revenue.getRevenueDashboard)
+r.get('/dashboard/revenue', authenticate, requireSuperAdmin, revenue.getRevenueDashboard)
 
 // ── Pricing (superadmin) ──────────────────────────────────────────────────────
 r.get('/pricing',                     authenticate, requireAdmin,      pricing.getPricing)
@@ -94,13 +95,19 @@ r.get('/pricing/fee/:contentType',    authenticate, requireAdmin,      payment.g
 r.put('/pricing/:contentType',        authenticate, requireSuperAdmin, pricing.updatePricing)
 
 // ── Payment (QPay) ────────────────────────────────────────────────────────────
-r.post('/pay/callback',              payment.qpayCallback)   // webhook
-r.post('/payments/qpay-webhook',     payment.qpayCallback)   // alias (old URL)
+r.post('/pay/callback',              payment.qpayCallback)   // webhook (POST)
+r.get ('/pay/callback',              payment.qpayCallback)   // webhook (зарим тохиолдолд QPay GET-ээр дуудна)
+r.post('/payments/qpay-webhook',     payment.qpayCallback)   // alias (хуучин URL)
 r.post('/pay/create',                authenticate, requireAdmin, payment.createContentPayment)
 r.get ('/pay/check/:invoiceId',      authenticate, requireAdmin, payment.checkContentPayment)
 r.get ('/pay/upgrade/fee',              authenticate, payment.getUpgradeFee)
 r.post('/pay/upgrade',                  authenticate, payment.createUpgradePayment)
 r.get ('/pay/upgrade/check/:invoiceId', authenticate, payment.checkUpgradePayment)
+
+// ── Wallet ────────────────────────────────────────────────────────────────────
+r.get ('/wallet',                    authenticate, wallet.getWallet)
+r.post('/wallet/topup',              authenticate, wallet.createTopup)
+r.get ('/wallet/topup/check/:invoiceId', authenticate, wallet.checkTopup)
 
 // ── Routes (public) ───────────────────────────────────────────────────────────
 r.get('/routes',              routes.getRoutes)

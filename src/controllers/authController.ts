@@ -14,6 +14,7 @@ function safeUser(u: any) {
   return {
     id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar || null, provider: u.provider,
     hasGoogle: !!u.google_id, hasFacebook: !!u.facebook_id, hasPassword: !!u.password,
+    walletBalance: Number(u.wallet_balance) || 0,
   }
 }
 
@@ -332,7 +333,7 @@ export async function changePassword(req: Request, res: Response) {
 export async function getMe(req: Request, res: Response) {
   try {
     const [rows]: any = await pool.execute(
-      'SELECT id, name, email, avatar, role, provider, password, google_id, facebook_id, created_at FROM users WHERE id = ? AND is_active = 1 LIMIT 1',
+      'SELECT id, name, email, avatar, role, provider, password, google_id, facebook_id, wallet_balance, created_at FROM users WHERE id = ? AND is_active = 1 LIMIT 1',
       [req.user!.id]
     )
     if (!rows.length) return res.status(404).json({ success: false, message: 'Хэрэглэгч олдсонгүй' })

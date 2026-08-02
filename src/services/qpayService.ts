@@ -40,12 +40,6 @@ async function getToken(): Promise<string> {
   return fetchFreshToken()
 }
 
-export interface InvoiceResult {
-  invoiceId: string
-  qrText:    string
-  qrImage:   string
-}
-
 async function qpayFetch(url: string, options: RequestInit, retry = true): Promise<any> {
   const token = await getToken()
   const res = await fetch(url, {
@@ -67,6 +61,22 @@ async function qpayFetch(url: string, options: RequestInit, retry = true): Promi
   return res.json()
 }
 
+export interface InvoiceResult {
+  invoiceId: string
+  qrText:    string
+  qrImage:   string
+  expiresAt: Date | null
+}
+
+// POST /v2/invoice-ийн response
+interface QPayInvoiceCreateResponse {
+  invoice_id?:  string
+  id?:          string
+  qr_code?:     string
+  qr_image?:    string
+  expiry_date?: string
+}
+
 export async function createInvoice(params: {
   invoiceNo:    string
   description:  string
@@ -80,7 +90,11 @@ export async function createInvoice(params: {
   const bankAcct   = process.env.SYSTEM_ACCOUNT_NUMBER || ''
   const bankName   = (process.env.SYSTEM_ACCOUNT_NAME || '').replace(/^"|"$/g, '')
 
-  const d = await qpayFetch(`${BASE()}/v2/invoice`, {
+  if (!callback) {
+    console.warn('[QPay] QPAY_CALL_BACK_URL тохируулаагүй байна — төлбөр төлөгдсөний дараа webhook ирэхгүй, зөвхөн frontend-ийн polling-оор л баталгаажина')
+  }
+
+  const d: QPayInvoiceCreateResponse = await qpayFetch(`${BASE()}/v2/invoice`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -103,18 +117,56 @@ export async function createInvoice(params: {
     }),
   })
 
+  const invoiceId = d.invoice_id || d.id || ''
+  if (!invoiceId) {
+    throw new Error('QPay invoice_id хоосон байна — response format шалгана уу')
+  }
+
   return {
-    invoiceId: d.id      || '',
-    qrText:    d.qr_code || '',
-    qrImage:   d.qr_image || '',
+    invoiceId,
+    qrText:  d.qr_code  || '',
+    qrImage: d.qr_image || '',
+    expiresAt: d.expiry_date ? new Date(d.expiry_date) : null,
   }
 }
 
-export async function checkPayment(invoiceId: string): Promise<{ paid: boolean }> {
-  const d = await qpayFetch(`${BASE()}/v2/payment/check`, {
+// POST /v2/payment/check-ийн response (QPay-ийн албан ёсны баримт бичигт бичигдсэн бодит форматтай таарсан)
+interface QPayPaymentCheckResponse {
+  id?:                  string
+  invoice_status?:      string   // 'PAID' | 'NEW' | 'EXPIRED' гэх мэт
+  invoice_status_date?: string
+  payments?: Array<{
+    id:             string
+    amount:         string
+    payment_status: string       // 'SUCCESS' | 'FAILED' гэх мэт
+  }>
+}
+
+export interface PaymentCheckResult {
+  paid:        boolean
+  paidAmount?: number
+}
+
+// Төлбөрийн жинхэнэ баталгаа болгож зөвхөн invoice_status === 'PAID' эсэхийг шалгана —
+// payments[].payment_status зэрэг бусад талбарыг найдваргүй гэж үзнэ (QPay-ийн албан баримт бичигт
+// invoice_status-г эцсийн шийдвэр гэж заасан байдаг)
+export async function checkPayment(invoiceId: string): Promise<PaymentCheckResult> {
+  const d: QPayPaymentCheckResponse = await qpayFetch(`${BASE()}/v2/payment/check`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ invoice_id: invoiceId }),
   })
-  return { paid: d.invoice_status === 'PAID' }
+
+  const paid = d.invoice_status === 'PAID'
+  const paidAmount = paid
+    ? d.payments?.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    : undefined
+
+  return { paid, paidAmount }
+}
+
+// QPay invoice-ийн хугацаа дууссан эсэхийг шалгана (enable_expiry/expiry_date-д үндэслэсэн)
+export function isInvoiceExpired(expiresAt: Date | string | null | undefined): boolean {
+  if (!expiresAt) return false
+  return new Date(expiresAt).getTime() < Date.now()
 }
