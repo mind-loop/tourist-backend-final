@@ -17,7 +17,8 @@ export async function getActiveBanners(_req: Request, res: Response) {
       'SELECT * FROM banners WHERE is_active=1 ORDER BY sort_order ASC, id ASC'
     )
     res.json({ success: true, data: rows })
-  } catch {
+  } catch (err: any) {
+    console.error('getActiveBanners error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }
@@ -32,7 +33,8 @@ export async function getAllBanners(req: Request, res: Response) {
       params
     )
     res.json({ success: true, data: rows })
-  } catch {
+  } catch (err: any) {
+    console.error('getAllBanners error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }
@@ -59,7 +61,8 @@ export async function createBanner(req: Request, res: Response) {
       ]
     )
     res.status(201).json({ success: true, data: { id: result.insertId } })
-  } catch {
+  } catch (err: any) {
+    console.error('createBanner error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }
@@ -72,7 +75,8 @@ export async function toggleBanner(req: Request, res: Response) {
     }
     await pool.execute('UPDATE banners SET is_active=NOT is_active WHERE id=?', [req.params.id])
     res.json({ success: true, message: 'Баннер шинэчлэгдлээ' })
-  } catch {
+  } catch (err: any) {
+    console.error('toggleBanner error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }
@@ -85,7 +89,8 @@ export async function deleteBanner(req: Request, res: Response) {
     }
     await pool.execute('DELETE FROM banners WHERE id=?', [req.params.id])
     res.json({ success: true, message: 'Баннер устгагдлаа' })
-  } catch {
+  } catch (err: any) {
+    console.error('deleteBanner error:', err)
     res.status(500).json({ success: false, message: 'Серверийн алдаа' })
   }
 }

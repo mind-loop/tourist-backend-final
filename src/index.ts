@@ -75,7 +75,10 @@ app.use(
 
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/v1', routes)
-
+// -- check point log title
+app.use("/success", (_req, res) => {
+  res.json({ success: true, message: 'Success route is working! 2026.8.2' })
+})
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), port: PORT })
