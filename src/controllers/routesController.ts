@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { alterTableSafe } from '../utils/dbMigrate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -183,7 +184,5 @@ export async function migrateRoutes() {
       FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
-  await pool.execute(
-    `ALTER TABLE routes ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL`
-  ).catch(() => {})
+  await alterTableSafe(`ALTER TABLE routes ADD COLUMN IF NOT EXISTS created_by INT DEFAULT NULL`)
 }

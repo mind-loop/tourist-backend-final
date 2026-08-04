@@ -5,7 +5,8 @@ import morgan from 'morgan'
 import path from 'path'
 import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
-import { testConnection } from './config/database'
+import { testConnection, ensureDatabaseExists } from './config/database'
+import { migrateBaseTables } from './config/migrate'
 import routes from './routes/index'
 import { migrateRoutes }  from './controllers/routesController'
 import { migratePlaces }  from './controllers/placesController'
@@ -100,7 +101,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 // ── Start ─────────────────────────────────────────────────────────────────────
 async function start() {
   try {
+    await ensureDatabaseExists()
     await testConnection()
+    await migrateBaseTables()
     await migratePlaces()
     await migrateRoutes()
     await migrateTours()

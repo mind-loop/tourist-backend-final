@@ -181,46 +181,34 @@ const tables = [
     INDEX idx_tour (tour_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
-  `CREATE TABLE IF NOT EXISTS routes (
-    id               INT AUTO_INCREMENT PRIMARY KEY,
-    title_mn         VARCHAR(255) NOT NULL DEFAULT '',
-    title_en         VARCHAR(255) DEFAULT '',
-    title_ru         VARCHAR(255) DEFAULT '',
-    from_mn          VARCHAR(255) NOT NULL DEFAULT '',
-    from_en          VARCHAR(255) DEFAULT '',
-    from_ru          VARCHAR(255) DEFAULT '',
-    to_mn            VARCHAR(255) NOT NULL DEFAULT '',
-    to_en            VARCHAR(255) DEFAULT '',
-    to_ru            VARCHAR(255) DEFAULT '',
-    total_km         DECIMAL(8,1) NOT NULL DEFAULT 0,
-    paved_km         DECIMAL(8,1) DEFAULT 0,
-    dirt_km          DECIMAL(8,1) DEFAULT 0,
-    duration_minutes INT DEFAULT 0,
-    stop_count       INT DEFAULT 0,
-    food_count       INT DEFAULT 0,
-    overnight_count  INT DEFAULT 0,
-    aimag_center_km  DECIMAL(8,1) DEFAULT 0,
-    cover_image      VARCHAR(500) DEFAULT NULL,
-    status           ENUM('published','draft') NOT NULL DEFAULT 'draft',
-    sort_order       INT NOT NULL DEFAULT 0,
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // routes хүснэгтийг routesController.migrateRoutes() үүсгэнэ (created_by FK-тай
+  // сүүлийн schema-тай, migrateBaseTables() дараа автоматаар дуудагддаг тул users
+  // хүснэгт аль хэдийн байгаа байна) — энд давхардуулахгүй.
 ]
 
-async function migrate() {
-  console.log('🔄 Running migrations...')
+// Суурь хүснэгтүүд (users, places, tours, routes г.м) — dependency дарааллаар нь үүсгэнэ.
+// index.ts-ийн start() дотроос автоматаар дуудагддаг тул шинэ/хоосон DB дээр
+// `npm run dev` ганцаараа бүх хүснэгтийг алдаагүй үүсгэнэ.
+export async function migrateBaseTables(): Promise<void> {
   for (const sql of tables) {
     const name = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1]
     try {
       await pool.execute(sql)
-      console.log(`  ✅  ${name}`)
     } catch (err: any) {
       console.error(`  ❌  ${name}:`, err.message)
-      process.exit(1)
+      throw err
     }
   }
-  console.log('✅ Migration complete')
-  process.exit(0)
 }
 
-migrate()
+// `npm run db:migrate` (tsx src/config/migrate.ts) -аар шууд ажиллуулбал энэ хэсэг ажиллана.
+// index.ts import хийхэд require.main !== module тул автоматаар ажиллахгүй.
+if (require.main === module) {
+  console.log('🔄 Running migrations...')
+  migrateBaseTables()
+    .then(() => {
+      console.log('✅ Migration complete')
+      process.exit(0)
+    })
+    .catch(() => process.exit(1))
+}

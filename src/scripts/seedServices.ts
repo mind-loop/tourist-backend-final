@@ -3,6 +3,7 @@
 // баталгаажуулсны дараа өөрөө нийтэлнэ (утасны дугаар зэрэг заримыг баталгаажуулаагүй тул).
 // Ажиллуулах: npx tsx src/scripts/seedServices.ts
 
+import bcrypt from 'bcryptjs'
 import pool from '../config/database'
 import slugify from 'slugify'
 import { autoTranslateFields } from '../utils/autoTranslate'
@@ -121,10 +122,16 @@ const ITEMS: SeedService[] = [
 ]
 
 async function main() {
-  const [[admin]]: any = await pool.query(`SELECT id FROM users WHERE role='superadmin' LIMIT 1`)
+  let [[admin]]: any = await pool.query(`SELECT id FROM users WHERE role='superadmin' LIMIT 1`)
   if (!admin) {
-    console.error('Superadmin хэрэглэгч олдсонгүй — эхлээд db:seed ажиллуулна уу.')
-    process.exit(1)
+    const hash = await bcrypt.hash('superadmin123', 10)
+    const [result]: any = await pool.execute(
+      `INSERT INTO users (name, email, password, role, provider)
+       VALUES (?, ?, ?, 'superadmin', 'local')`,
+      ['SuperAdmin', 'superadmin@qruvs.mn', hash]
+    )
+    admin = { id: result.insertId }
+    console.log('  ✅ SuperAdmin үүсгэлээ: superadmin@qruvs.mn / superadmin123')
   }
 
   for (const item of ITEMS) {

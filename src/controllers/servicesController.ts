@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import slugify from 'slugify'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { alterTableSafe } from '../utils/dbMigrate'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -48,7 +49,7 @@ export async function migrateServices() {
 
   // category нь эрт үед ENUM('hotel','restaurant','repair','other') байсан —
   // одоо чөлөөт ангилалын жагсаалт болгож VARCHAR руу шилжүүлж, хуучин утгуудыг шинэ key рүү мапп хийнэ
-  await pool.execute(`ALTER TABLE services ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`).catch(() => {})
+  await alterTableSafe(`ALTER TABLE services ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`)
   await pool.execute(`ALTER TABLE services MODIFY COLUMN category VARCHAR(30) NOT NULL DEFAULT 'other'`).catch(() => {})
   await pool.execute(`UPDATE services SET category='accommodation' WHERE category='hotel'`).catch(() => {})
   await pool.execute(`UPDATE services SET category='car_repair' WHERE category='repair'`).catch(() => {})

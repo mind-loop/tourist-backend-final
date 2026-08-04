@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import * as qpay from '../services/qpayService'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { alterTableSafe } from '../utils/dbMigrate'
 
 // GET /tours  (public)
 export async function getTours(req: Request, res: Response) {
@@ -484,24 +485,6 @@ export async function updateTourStatus(req: Request, res: Response) {
 
 // Startup migration
 export async function migrateTours() {
-  // Add settlement + payment columns (safe — ignore if already exists)
-  const alterQueries = [
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settlement_status ENUM('pending','settled') DEFAULT 'pending'`,
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settled_at TIMESTAMP NULL`,
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settled_by INT DEFAULT NULL`,
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50) DEFAULT NULL`,
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_email VARCHAR(150) DEFAULT NULL`,
-    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`,
-    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_invoice_id VARCHAR(200) DEFAULT NULL`,
-    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_status ENUM('free','pending','paid') DEFAULT 'free'`,
-    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2) DEFAULT 0`,
-    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP NULL`,
-    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP NULL`,
-  ]
-  for (const q of alterQueries) {
-    await pool.execute(q).catch(() => {/* column may already exist in MySQL 5.x */})
-  }
-
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS tours (
       id                   INT AUTO_INCREMENT PRIMARY KEY,
@@ -552,4 +535,22 @@ export async function migrateTours() {
       INDEX idx_tour (tour_id)
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
   `)
+
+  // Хуучин DB дээрх tours/tour_registrations хүснэгтэд дараа нь нэмэгдсэн багануудыг нэмнэ
+  const alterQueries = [
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settlement_status ENUM('pending','settled') DEFAULT 'pending'`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settled_at TIMESTAMP NULL`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS settled_by INT DEFAULT NULL`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_phone VARCHAR(50) DEFAULT NULL`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS contact_email VARCHAR(150) DEFAULT NULL`,
+    `ALTER TABLE tours ADD COLUMN IF NOT EXISTS youtube_url VARCHAR(500) DEFAULT NULL`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_invoice_id VARCHAR(200) DEFAULT NULL`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS qpay_status ENUM('free','pending','paid') DEFAULT 'free'`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2) DEFAULT 0`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP NULL`,
+    `ALTER TABLE tour_registrations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP NULL`,
+  ]
+  for (const q of alterQueries) {
+    await alterTableSafe(q)
+  }
 }
