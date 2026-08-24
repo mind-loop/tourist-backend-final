@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import { autoTranslateFields } from '../utils/autoTranslate'
 import { alterTableSafe } from '../utils/dbMigrate'
+import { uploadImage } from '../services/uploadCloudService'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -48,7 +49,7 @@ export async function createBanner(req: Request, res: Response) {
     await autoTranslateFields(req.body, ['title', 'subtitle'])
     const { title_mn, title_en, title_ru, subtitle_mn, subtitle_en, subtitle_ru, link_url, sort_order } = req.body
 
-    const imageUrl = req.file ? `/uploads/images/${req.file.filename}` : ''
+    const imageUrl = req.file ? (await uploadImage(req.file)).url : ''
     const [result]: any = await pool.execute(
       `INSERT INTO banners
          (title_mn, title_en, title_ru, subtitle_mn, subtitle_en, subtitle_ru,

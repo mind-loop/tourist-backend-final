@@ -30,7 +30,7 @@ app.use(helmet({
 }))
 
 const ALLOWED_ORIGINS = [
-  'https://tourist-api.e-uvs.mn',
+  'https://tourist-api.itwork.mn',
   'https://www.e-uvs.mn',
   'https://tourist.e-uvs.mn',
   'https://e-uvs.mn',

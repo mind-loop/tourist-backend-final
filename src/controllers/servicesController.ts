@@ -3,6 +3,7 @@ import pool from '../config/database'
 import slugify from 'slugify'
 import { autoTranslateFields } from '../utils/autoTranslate'
 import { alterTableSafe } from '../utils/dbMigrate'
+import { uploadImage } from '../services/uploadCloudService'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -151,7 +152,7 @@ export async function createService(req: Request, res: Response) {
 
     const base = slugify(b.name_mn, { lower: true, strict: true }) || 'service'
     const slug = `${base}-${Date.now()}`
-    const cover_image = req.file ? `/uploads/images/${req.file.filename}` : null
+    const cover_image = req.file ? (await uploadImage(req.file)).url : null
 
     const [result]: any = await pool.execute(
       `INSERT INTO services
@@ -193,7 +194,7 @@ export async function updateService(req: Request, res: Response) {
 
     await autoTranslateFields(b, ['name', 'description', 'address', 'open_hours'])
 
-    const cover_image = req.file ? `/uploads/images/${req.file.filename}` : b.cover_image || null
+    const cover_image = req.file ? (await uploadImage(req.file)).url : b.cover_image || null
 
     await pool.execute(
       `UPDATE services SET

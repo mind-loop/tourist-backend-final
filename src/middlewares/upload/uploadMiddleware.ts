@@ -1,19 +1,8 @@
 import multer from 'multer'
 import path from 'path'
-import fs from 'fs'
-import { v4 as uuidv4 } from 'uuid'
 import { RequestHandler } from 'express'
 
-const UPLOAD_DIR = path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads', 'images')
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase()
-    cb(null, `${uuidv4()}${ext}`)
-  },
-})
+const storage = multer.memoryStorage()
 
 function fileFilter(_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) {
   const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
@@ -33,5 +22,3 @@ export const uploadTourFields  = multer({ storage, fileFilter, limits }).fields(
   { name: 'image', maxCount: 1 },
   { name: 'qr_image', maxCount: 1 },
 ]) as unknown as RequestHandler
-
-export const IMAGES_BASE = '/uploads/images'

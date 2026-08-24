@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import { autoTranslateFields } from '../utils/autoTranslate'
 import { alterTableSafe } from '../utils/dbMigrate'
+import { uploadImage } from '../services/uploadCloudService'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -54,7 +55,7 @@ export async function createRoute(req: Request, res: Response) {
   try {
     const b = req.body
     const file = (req.file as Express.Multer.File) || null
-    const cover_image = file ? `/uploads/images/${file.filename}` : b.cover_image || null
+    const cover_image = file ? (await uploadImage(file)).url : b.cover_image || null
 
     await autoTranslateFields(b, ['title', 'from', 'to'])
 
@@ -93,7 +94,7 @@ export async function updateRoute(req: Request, res: Response) {
     }
     const b = req.body
     const file = (req.file as Express.Multer.File) || null
-    const cover_image = file ? `/uploads/images/${file.filename}` : b.cover_image || null
+    const cover_image = file ? (await uploadImage(file)).url : b.cover_image || null
 
     await autoTranslateFields(b, ['title', 'from', 'to'])
 

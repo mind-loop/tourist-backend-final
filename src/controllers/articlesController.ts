@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import pool from '../config/database'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { uploadImage } from '../services/uploadCloudService'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -90,7 +91,7 @@ export async function createArticle(req: Request, res: Response) {
     await autoTranslateFields(b, ['title', 'excerpt', 'content'])
 
     const slug = `article-${Date.now()}`
-    const coverImage = req.file ? `/uploads/images/${req.file.filename}` : null
+    const coverImage = req.file ? (await uploadImage(req.file)).url : null
     const isPublished = b.status === 'published'
 
     const [result]: any = await pool.execute(
@@ -145,7 +146,7 @@ export async function updateArticle(req: Request, res: Response) {
       return res.status(403).json({ success: false, message: 'Зөвхөн өөрийн нийтлэлийг засах боломжтой' })
     }
     const b = req.body
-    const coverImage = req.file ? `/uploads/images/${req.file.filename}` : b.cover_image || null
+    const coverImage = req.file ? (await uploadImage(req.file)).url : b.cover_image || null
     const isPublished = b.status === 'published'
 
     await autoTranslateFields(b, ['title', 'excerpt', 'content'])

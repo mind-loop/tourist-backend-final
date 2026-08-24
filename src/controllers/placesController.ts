@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import pool from '../config/database'
 import slugify from 'slugify'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { uploadImages, deleteImage as deleteRemoteImage } from '../services/uploadCloudService'
 
 function isSA(req: Request) { return req.user?.role === 'superadmin' }
 
@@ -260,10 +261,11 @@ export async function createPlace(req: Request, res: Response) {
     }
 
     // Images — эхний файл cover болно
-    for (let i = 0; i < files.length; i++) {
+    const uploaded = await uploadImages(files)
+    for (let i = 0; i < uploaded.length; i++) {
       await pool.execute(
         'INSERT INTO place_images (place_id, url, is_cover, sort_order) VALUES (?,?,?,?)',
-        [placeId, `/uploads/images/${files[i].filename}`, i === 0 ? 1 : 0, i]
+        [placeId, uploaded[i].url, i === 0 ? 1 : 0, i]
       )
     }
 
@@ -342,11 +344,12 @@ export async function updatePlace(req: Request, res: Response) {
       )
       const hasCover = existing.length > 0
 
-      for (let i = 0; i < files.length; i++) {
+      const uploaded = await uploadImages(files)
+      for (let i = 0; i < uploaded.length; i++) {
         const isCover = !hasCover && i === 0 ? 1 : 0
         await pool.execute(
           'INSERT INTO place_images (place_id, url, is_cover, sort_order) VALUES (?,?,?,?)',
-          [id, `/uploads/images/${files[i].filename}`, isCover, 999 + i]
+          [id, uploaded[i].url, isCover, 999 + i]
         )
       }
     }
@@ -411,11 +414,10 @@ export async function deleteImage(req: Request, res: Response) {
       )
     }
 
-    // Disk дээрх файлыг устгана
-    const fs = await import('fs')
-    const path = await import('path')
-    const filePath = path.join(process.cwd(), url)
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    // upload-cloudmn дээрх зургийг устгана
+    if (/^https?:\/\//.test(url)) {
+      await deleteRemoteImage(url).catch((err) => console.error('deleteRemoteImage error:', err))
+    }
 
     res.json({ success: true, message: 'Зураг устгагдлаа' })
   } catch (err: any) {

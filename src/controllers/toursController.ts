@@ -3,6 +3,7 @@ import pool from '../config/database'
 import * as qpay from '../services/qpayService'
 import { autoTranslateFields } from '../utils/autoTranslate'
 import { alterTableSafe } from '../utils/dbMigrate'
+import { uploadImage } from '../services/uploadCloudService'
 
 // GET /tours  (public)
 export async function getTours(req: Request, res: Response) {
@@ -350,8 +351,8 @@ export async function createTour(req: Request, res: Response) {
     const files = req.files as Record<string, Express.Multer.File[]> | undefined
     const coverFile = files?.image?.[0] || null
     const qrFile    = files?.qr_image?.[0] || null
-    const cover_image = coverFile ? `/uploads/images/${coverFile.filename}` : b.cover_image || null
-    const payment_qr  = qrFile    ? `/uploads/images/${qrFile.filename}`   : b.payment_qr || null
+    const cover_image = coverFile ? (await uploadImage(coverFile)).url : b.cover_image || null
+    const payment_qr  = qrFile    ? (await uploadImage(qrFile)).url   : b.payment_qr || null
     const slug = `tour-${Date.now()}`
 
     await autoTranslateFields(b, ['title', 'description'])
@@ -405,8 +406,8 @@ export async function updateTour(req: Request, res: Response) {
     const files = req.files as Record<string, Express.Multer.File[]> | undefined
     const coverFile = files?.image?.[0] || null
     const qrFile    = files?.qr_image?.[0] || null
-    const cover_image = coverFile ? `/uploads/images/${coverFile.filename}` : b.cover_image || null
-    const payment_qr  = qrFile    ? `/uploads/images/${qrFile.filename}`   : b.payment_qr || null
+    const cover_image = coverFile ? (await uploadImage(coverFile)).url : b.cover_image || null
+    const payment_qr  = qrFile    ? (await uploadImage(qrFile)).url   : b.payment_qr || null
 
     await autoTranslateFields(b, ['title', 'description'])
 
