@@ -20,6 +20,8 @@ export const pool = mysql.createPool({
   charset:          'utf8mb4',
   timezone:         'Z',
   multipleStatements: false,
+  enableKeepAlive:  true,
+  keepAliveInitialDelay: 10000,
 })
 
 // Огт хоосон MySQL сервер дээр (DB_NAME-тэй бааз урьдчилан үүсээгүй) ч гэсэн
