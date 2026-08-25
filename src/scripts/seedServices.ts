@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 import pool from '../config/database'
 import slugify from 'slugify'
 import { autoTranslateFields } from '../utils/autoTranslate'
+import { migrateServices } from '../controllers/servicesController'
 
 interface SeedService {
   name_mn: string
@@ -122,6 +123,8 @@ const ITEMS: SeedService[] = [
 ]
 
 async function main() {
+  await migrateServices()
+
   let [[admin]]: any = await pool.query(`SELECT id FROM users WHERE role='superadmin' LIMIT 1`)
   if (!admin) {
     const hash = await bcrypt.hash('superadmin123', 10)
