@@ -5,10 +5,15 @@ import { RequestHandler } from 'express'
 const storage = multer.memoryStorage()
 
 function fileFilter(_req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif']
+  const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif']
   const ext = path.extname(file.originalname).toLowerCase()
-  if (allowed.includes(ext)) cb(null, true)
-  else cb(new Error('Зөвхөн зургийн файл оруулна уу'))
+  if (allowed.includes(ext)) {
+    cb(null, true)
+  } else {
+    const err: any = new Error('Зөвхөн зургийн файл оруулна уу (jpg, png, webp, gif, heic)')
+    err.status = 400
+    cb(err)
+  }
 }
 
 const MAX_MB = Number(process.env.MAX_FILE_SIZE_MB) || 10
